@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
 use eframe::egui;
+use egui::RichText;
 use egui_extras::{Column, TableBuilder};
 use std::path::PathBuf;
 
@@ -26,7 +27,8 @@ struct BeamPaths {
 
 struct StagedMod {
     mod_name: String,
-    active: bool,
+    // active: bool,
+    selected: bool,
 }
 
 struct App {
@@ -54,7 +56,8 @@ impl Default for App {
             .get_mods()
             .map(|mod_name| StagedMod {
                 mod_name: mod_name.to_owned(),
-                active: mod_cfg.is_mod_active(&mod_name).unwrap(),
+                // active: mod_cfg.is_mod_active(&mod_name).unwrap(),
+                selected: false,
             })
             .collect();
         Self {
@@ -68,24 +71,65 @@ impl Default for App {
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        egui::CentralPanel::default().show(ctx, |ui| {
+        egui::TopBottomPanel::top("title_panel").show(ctx, |ui| {
             ui.heading("BeamMM.gui");
-
-            if ui.button("Apply").clicked() {
-                for staged_mod in &self.staged_mods {
+            ui.horizontal(|ui| {
+                ui.label("Version:");
+                ui.label(env!("CARGO_PKG_VERSION"));
+            });
+            ui.horizontal(|ui| {
+                ui.label("BeamNG.drive Version:");
+                ui.label(&self.game_version);
+            });
+        });
+        egui::CentralPanel::default().show(ctx, |ui| {
+            ui.horizontal(|ui| {
+                if ui.button("Select All").clicked() {
+                    for staged_mod in &mut self.staged_mods {
+                        staged_mod.selected = true;
+                    }
+                }
+                if ui.button("Deselect All").clicked() {
+                    for staged_mod in &mut self.staged_mods {
+                        staged_mod.selected = false;
+                    }
+                }
+            });
+            ui.horizontal(|ui| {
+                if ui.button("Enable Selected").clicked() {
+                    for staged_mod in &self.staged_mods {
+                        if staged_mod.selected {
+                            self.beam_mod_config
+                                .set_mod_active(&staged_mod.mod_name, true)
+                                .unwrap();
+                        }
+                    }
                     self.beam_mod_config
-                        .set_mod_active(&staged_mod.mod_name, staged_mod.active)
+                        .save_to_path(&self.beam_paths.mods_dir)
                         .unwrap();
                 }
-                self.beam_mod_config
-                    .save_to_path(&self.beam_paths.mods_dir)
-                    .unwrap();
-            }
+                if ui.button("Disable Selected").clicked() {
+                    for staged_mod in &self.staged_mods {
+                        if staged_mod.selected {
+                            self.beam_mod_config
+                                .set_mod_active(&staged_mod.mod_name, false)
+                                .unwrap();
+                        }
+                    }
+                    self.beam_mod_config
+                        .save_to_path(&self.beam_paths.mods_dir)
+                        .unwrap();
+                }
+            });
 
             TableBuilder::new(ui)
-                .column(Column::auto().resizable(true))
+                .column(Column::auto().resizable(false))
+                .column(Column::auto().resizable(false))
                 .column(Column::remainder())
                 .header(20.0, |mut header| {
+                    header.col(|ui| {
+                        ui.label("Select");
+                    });
                     header.col(|ui| {
                         ui.label("Active");
                     });
@@ -95,9 +139,21 @@ impl eframe::App for App {
                 })
                 .body(|mut body| {
                     for staged_mod in &mut self.staged_mods {
-                        body.row(30.0, |mut row| {
+                        body.row(20.0, |mut row| {
                             row.col(|ui| {
-                                ui.checkbox(&mut staged_mod.active, "");
+                                ui.checkbox(&mut staged_mod.selected, "");
+                            });
+                            row.col(|ui| {
+                                let text = if self
+                                    .beam_mod_config
+                                    .is_mod_active(&staged_mod.mod_name)
+                                    .unwrap()
+                                {
+                                    RichText::new("Yes").color(egui::Color32::GREEN)
+                                } else {
+                                    RichText::new("No").color(egui::Color32::RED)
+                                };
+                                ui.label(text);
                             });
                             row.col(|ui| {
                                 ui.label(&staged_mod.mod_name);
