@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
+use beammm::Preset;
 use eframe::egui;
 use egui::RichText;
 use egui_extras::{Column, TableBuilder};
@@ -18,6 +19,7 @@ fn main() -> eframe::Result {
     )
 }
 
+#[derive(Debug)]
 struct BeamPaths {
     beamng_dir: PathBuf,
     mods_dir: PathBuf,
@@ -36,6 +38,8 @@ struct App {
     beam_paths: BeamPaths,
     game_version: String,
     staged_mods: Vec<StagedMod>,
+    presets: Vec<(String, Preset)>,
+    current_preset: Option<String>,
 }
 
 impl Default for App {
@@ -44,20 +48,35 @@ impl Default for App {
         let beamng_dir = beammm::path::beamng_dir_default().unwrap();
         let game_version = beammm::game_version(&beamng_dir).unwrap();
         let mods_dir = beammm::path::mods_dir(&beamng_dir, &game_version).unwrap();
-        let presets_dir = beammm::path::presets_dir(&beamng_dir).unwrap();
+        let beammm_dir = beammm::path::beammm_dir().unwrap();
+        let presets_dir = beammm::path::presets_dir(&beammm_dir).unwrap();
         let beam_paths = BeamPaths {
             beamng_dir,
             mods_dir,
-            beammm_dir: beammm::path::beammm_dir().unwrap(),
+            beammm_dir,
             presets_dir,
         };
         let mod_cfg = beammm::game::ModCfg::load_from_path(&beam_paths.mods_dir).unwrap();
-        let staged_mods: Vec<StagedMod> = mod_cfg
-            .get_mods()
+        let mut staged_mods = mod_cfg.get_mods().collect::<Vec<&String>>();
+
+        staged_mods.sort();
+
+        let staged_mods = staged_mods
+            .into_iter()
             .map(|mod_name| StagedMod {
                 mod_name: mod_name.to_owned(),
                 // active: mod_cfg.is_mod_active(&mod_name).unwrap(),
                 selected: false,
+            })
+            .collect();
+
+        let presets = Preset::list(&beam_paths.presets_dir)
+            .unwrap()
+            .map(|preset_name| {
+                (
+                    preset_name.clone(),
+                    Preset::load_from_path(&preset_name, &beam_paths.presets_dir).unwrap(),
+                )
             })
             .collect();
         Self {
@@ -65,6 +84,8 @@ impl Default for App {
             beam_paths,
             game_version,
             staged_mods,
+            presets,
+            current_preset: None,
         }
     }
 }
@@ -82,7 +103,83 @@ impl eframe::App for App {
                 ui.label(&self.game_version);
             });
         });
+
+        egui::SidePanel::right("presets_panel").show(ctx, |ui| {
+            ui.heading("Presets");
+            ui.horizontal(|_| {});
+
+            ui.label("All Presets:");
+            TableBuilder::new(ui)
+                .column(Column::exact(75.0))
+                .column(Column::auto().resizable(false))
+                .header(20.0, |mut header| {
+                    header.col(|ui| {
+                        ui.add(egui::Label::new("Enabled").wrap_mode(egui::TextWrapMode::Extend));
+                    });
+                    header.col(|ui| {
+                        ui.label("Preset Name");
+                    });
+                })
+                .body(|mut body| {
+                    for (preset_name, preset) in &mut self.presets {
+                        body.row(20.0, |mut row| {
+                            row.col(|ui| {
+                                let text = if preset.is_enabled() {
+                                    RichText::new("Enabled").color(egui::Color32::GREEN)
+                                } else {
+                                    RichText::new("Disabled").color(egui::Color32::RED)
+                                };
+                                if ui.button(text).clicked() {
+                                    if preset.is_enabled() {
+                                        preset.disable(&mut self.beam_mod_config).unwrap();
+                                    } else {
+                                        preset.enable();
+                                    }
+                                    preset.save_to_path(&self.beam_paths.presets_dir).unwrap();
+                                    self.beam_mod_config
+                                        .apply_presets(&self.beam_paths.presets_dir)
+                                        .unwrap();
+                                    self.beam_mod_config
+                                        .save_to_path(&self.beam_paths.mods_dir)
+                                        .unwrap();
+                                }
+                            });
+                            row.col(|ui| {
+                                ui.label(&*preset_name);
+                            });
+                        });
+                    }
+                });
+
+            ui.separator();
+
+            ui.horizontal(|ui| {
+                let mut preset_name: String = if let Some(preset_name) = &self.current_preset {
+                    preset_name
+                } else {
+                    "None"
+                }
+                .into();
+                ui.label("Edit Preset:");
+                ui.menu_button(preset_name.clone(), |ui| {
+                    for preset in beammm::Preset::list(&self.beam_paths.presets_dir).unwrap() {
+                        if ui.button(&preset).clicked() {
+                            preset_name = preset.to_owned();
+                            ui.close_menu();
+                        }
+                    }
+                });
+                self.current_preset = if preset_name == "None" {
+                    None
+                } else {
+                    Some(preset_name)
+                };
+            })
+        });
+
         egui::CentralPanel::default().show(ctx, |ui| {
+            ui.heading("Mods");
+            ui.horizontal(|_| {});
             ui.horizontal(|ui| {
                 if ui.button("Select All").clicked() {
                     for staged_mod in &mut self.staged_mods {
@@ -117,6 +214,9 @@ impl eframe::App for App {
                         }
                     }
                     self.beam_mod_config
+                        .apply_presets(&self.beam_paths.presets_dir)
+                        .unwrap();
+                    self.beam_mod_config
                         .save_to_path(&self.beam_paths.mods_dir)
                         .unwrap();
                 }
@@ -124,9 +224,9 @@ impl eframe::App for App {
 
             TableBuilder::new(ui)
                 .column(Column::auto().resizable(false))
-                .column(Column::auto().resizable(false))
+                .column(Column::exact(75.0).resizable(false))
                 .column(Column::remainder())
-                .header(20.0, |mut header| {
+                .header(15.0, |mut header| {
                     header.col(|ui| {
                         ui.label("Select");
                     });
@@ -144,16 +244,23 @@ impl eframe::App for App {
                                 ui.checkbox(&mut staged_mod.selected, "");
                             });
                             row.col(|ui| {
-                                let text = if self
+                                let active = self
                                     .beam_mod_config
                                     .is_mod_active(&staged_mod.mod_name)
-                                    .unwrap()
-                                {
-                                    RichText::new("Yes").color(egui::Color32::GREEN)
+                                    .unwrap();
+                                let text = if active {
+                                    RichText::new("Active").color(egui::Color32::GREEN)
                                 } else {
-                                    RichText::new("No").color(egui::Color32::RED)
+                                    RichText::new("Inactive").color(egui::Color32::RED)
                                 };
-                                ui.label(text);
+                                if ui.button(text).clicked() {
+                                    self.beam_mod_config
+                                        .set_mod_active(&staged_mod.mod_name, !active)
+                                        .unwrap();
+                                    self.beam_mod_config
+                                        .save_to_path(&self.beam_paths.mods_dir)
+                                        .unwrap();
+                                }
                             });
                             row.col(|ui| {
                                 ui.label(&staged_mod.mod_name);
