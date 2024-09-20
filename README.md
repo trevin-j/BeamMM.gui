@@ -33,6 +33,6 @@ Launch the program! The UI should be reasonably easy to understand. I'm not a UI
 
 ## Contributing
 
-Well... I appreciate the enthusiasm and desire to help but the code is currently pretty messy. It needs refactoring and some redesigns. A couple areas are even messier because of some lost battles against the borrow checker. And I'm still trying to figure out [egui](https://github.com/emilk/egui) and [eframe](https://github.com/emilk/eframe). I swear I've never run into as many borrow checker issues as when trying to work with these libraries. But I'm still new to them.
+Well... I appreciate the enthusiasm and desire to help but the code is currently pretty messy. It needs refactoring and some redesigns. A couple areas are even messier because of some lost battles against the borrow checker. And I'm still trying to figure out [egui](https://github.com/emilk/egui) and [eframe](https://github.com/emilk/egui/tree/master/crates/eframe). I swear I've never run into as many borrow checker issues as when trying to work with these libraries. But I'm still new to them.
 
 All that said, if you really desire to help, it's always welcome, and I'll look at any pull requests. This repository is mainly front-end GUI code. If you want to add/remove/change anything with the logic you will want to check out the other [BeamMM](https://github.com/trevin-j/BeamMM) repo.
