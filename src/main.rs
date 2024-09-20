@@ -174,7 +174,49 @@ impl eframe::App for App {
                 } else {
                     Some(preset_name)
                 };
-            })
+            });
+            if let Some(preset_name) = &self.current_preset {
+                ui.label("Preset Mods");
+
+                let preset = &mut self
+                    .presets
+                    .iter_mut()
+                    .find(|(name, _)| name == preset_name)
+                    .unwrap()
+                    .1;
+
+                let mut mods_to_remove = Vec::new();
+
+                ui.push_id("preset_mods", |ui| {
+                    TableBuilder::new(ui)
+                        .column(Column::auto().resizable(false))
+                        .column(Column::remainder())
+                        .header(20.0, |mut header| {
+                            header.col(|ui| {
+                                ui.label("");
+                            });
+                            header.col(|ui| {
+                                ui.label("Mod Name");
+                            });
+                        })
+                        .body(|mut body| {
+                            for mod_name in preset.get_mods().clone().into_iter() {
+                                body.row(20.0, |mut row| {
+                                    row.col(|ui| {
+                                        if ui.button("Remove").clicked() {
+                                            mods_to_remove.push(mod_name.clone());
+                                        }
+                                    });
+                                    row.col(|ui| {
+                                        ui.label(&*mod_name);
+                                    });
+                                });
+                            }
+                        });
+                    preset.remove_mods(&mods_to_remove);
+                    preset.save_to_path(&self.beam_paths.presets_dir).unwrap();
+                });
+            };
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
@@ -219,6 +261,27 @@ impl eframe::App for App {
                     self.beam_mod_config
                         .save_to_path(&self.beam_paths.mods_dir)
                         .unwrap();
+                }
+            });
+            ui.horizontal(|ui| {
+                if ui.button("Add to Selected Preset").clicked() {
+                    if let Some(preset_name) = &self.current_preset {
+                        let preset = &mut self
+                            .presets
+                            .iter_mut()
+                            .find(|(name, _)| name == preset_name)
+                            .unwrap()
+                            .1;
+                        for staged_mod in &self.staged_mods {
+                            if staged_mod.selected {
+                                preset.add_mod(&staged_mod.mod_name);
+                            }
+                        }
+                        preset.save_to_path(&self.beam_paths.presets_dir).unwrap();
+                        self.beam_mod_config
+                            .apply_presets(&self.beam_paths.presets_dir)
+                            .unwrap();
+                    }
                 }
             });
 
