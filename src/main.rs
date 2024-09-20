@@ -40,6 +40,7 @@ struct App {
     staged_mods: Vec<StagedMod>,
     presets: Vec<(String, Preset)>,
     current_preset: Option<String>,
+    new_preset_name: String,
 }
 
 impl Default for App {
@@ -86,6 +87,7 @@ impl Default for App {
             staged_mods,
             presets,
             current_preset: None,
+            new_preset_name: String::new(),
         }
     }
 }
@@ -168,6 +170,20 @@ impl eframe::App for App {
                             ui.close_menu();
                         }
                     }
+                    ui.horizontal(|ui| {
+                        ui.text_edit_singleline(&mut self.new_preset_name);
+                        if ui.button("Create").clicked() {
+                            let new_preset_name = self.new_preset_name.clone();
+                            self.new_preset_name = "".into();
+                            let new_preset = Preset::new(new_preset_name.clone(), vec![]);
+                            new_preset
+                                .save_to_path(&self.beam_paths.presets_dir)
+                                .unwrap();
+                            self.presets.push((new_preset_name.clone(), new_preset));
+                            preset_name = new_preset_name;
+                            ui.close_menu();
+                        }
+                    })
                 });
                 self.current_preset = if preset_name == "None" {
                     None
@@ -175,8 +191,13 @@ impl eframe::App for App {
                     Some(preset_name)
                 };
             });
+            let mut delete_preset = false;
             if let Some(preset_name) = &self.current_preset {
-                ui.label("Preset Mods");
+                if ui.button("Delete Preset").clicked() {
+                    delete_preset = true;
+                }
+
+                // ui.label("Preset Mods");
 
                 let preset = &mut self
                     .presets
@@ -189,14 +210,14 @@ impl eframe::App for App {
 
                 ui.push_id("preset_mods", |ui| {
                     TableBuilder::new(ui)
-                        .column(Column::auto().resizable(false))
+                        .column(Column::exact(75.0).resizable(false))
                         .column(Column::remainder())
                         .header(20.0, |mut header| {
                             header.col(|ui| {
                                 ui.label("");
                             });
                             header.col(|ui| {
-                                ui.label("Mod Name");
+                                ui.label("Preset Mods");
                             });
                         })
                         .body(|mut body| {
@@ -216,7 +237,14 @@ impl eframe::App for App {
                     preset.remove_mods(&mods_to_remove);
                     preset.save_to_path(&self.beam_paths.presets_dir).unwrap();
                 });
-            };
+            }
+            if delete_preset {
+                if let Some(preset_name) = &self.current_preset {
+                    Preset::delete(&preset_name, &self.beam_paths.presets_dir).unwrap();
+                    self.presets.retain(|(name, _)| name != preset_name);
+                }
+                self.current_preset = None;
+            }
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
