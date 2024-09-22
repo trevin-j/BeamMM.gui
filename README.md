@@ -2,6 +2,8 @@
 
 BeamMM.gui is a GUI implementation of [BeamMM](https://github.com/trevin-j/BeamMM), the logic of the mod manager.
 
+![screenshot](github/beammmgui.png)
+
 ## Features
 
 BeamMM.gui implements all but one of the features in BeamMM 0.1.0. 
