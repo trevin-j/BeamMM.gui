@@ -1,10 +1,13 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
 use beammm::Preset;
+use components::title_panel;
 use eframe::egui;
 use egui::RichText;
 use egui_extras::{Column, TableBuilder};
 use std::path::PathBuf;
+
+mod components;
 
 fn main() -> eframe::Result {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
@@ -94,17 +97,7 @@ impl Default for App {
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        egui::TopBottomPanel::top("title_panel").show(ctx, |ui| {
-            ui.heading("BeamMM.gui");
-            ui.horizontal(|ui| {
-                ui.label("Version:");
-                ui.label(env!("CARGO_PKG_VERSION"));
-            });
-            ui.horizontal(|ui| {
-                ui.label("BeamNG.drive Version:");
-                ui.label(&self.game_version);
-            });
-        });
+        title_panel(ctx, env!("CARGO_PKG_VERSION"), &self.game_version);
 
         egui::SidePanel::right("presets_panel").show(ctx, |ui| {
             ui.heading("Presets");
@@ -362,4 +355,3 @@ impl eframe::App for App {
         });
     }
 }
-
