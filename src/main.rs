@@ -38,7 +38,8 @@ struct StagedMod {
 struct App {
     beam_mod_config: beammm::game::ModCfg,
     beam_paths: BeamPaths,
-    game_version: String,
+    beamng_version: String,
+    version: String,
     staged_mods: Vec<StagedMod>,
     presets: Vec<(String, Preset)>,
     current_preset: Option<String>,
@@ -49,8 +50,8 @@ impl Default for App {
     // We will have to learn how to better handle these possible errors.
     fn default() -> Self {
         let beamng_dir = beammm::path::beamng_dir_default().unwrap();
-        let game_version = beammm::game_version(&beamng_dir).unwrap();
-        let mods_dir = beammm::path::mods_dir(&beamng_dir, &game_version).unwrap();
+        let beamng_version = beammm::game_version(&beamng_dir).unwrap();
+        let mods_dir = beammm::path::mods_dir(&beamng_dir, &beamng_version).unwrap();
         let beammm_dir = beammm::path::beammm_dir().unwrap();
         let presets_dir = beammm::path::presets_dir(&beammm_dir).unwrap();
         let beam_paths = BeamPaths {
@@ -85,7 +86,8 @@ impl Default for App {
         Self {
             beam_mod_config: mod_cfg,
             beam_paths,
-            game_version,
+            beamng_version,
+            version: env!("CARGO_PKG_VERSION").to_owned(),
             staged_mods,
             presets,
             current_preset: None,
@@ -96,7 +98,7 @@ impl Default for App {
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        components::title_panel(ctx, env!("CARGO_PKG_VERSION"), &self.game_version);
+        components::title_panel(ctx, self);
         components::presets_panel(ctx, self);
 
         egui::CentralPanel::default().show(ctx, |ui| {
