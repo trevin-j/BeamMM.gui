@@ -1,7 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
 use beammm::Preset;
-use components::title_panel;
 use eframe::egui;
 use egui::RichText;
 use egui_extras::{Column, TableBuilder};
@@ -97,148 +96,8 @@ impl Default for App {
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        title_panel(ctx, env!("CARGO_PKG_VERSION"), &self.game_version);
-
-        egui::SidePanel::right("presets_panel").show(ctx, |ui| {
-            ui.heading("Presets");
-            ui.horizontal(|_| {});
-
-            ui.label("All Presets:");
-            TableBuilder::new(ui)
-                .column(Column::exact(75.0))
-                .column(Column::auto().resizable(false))
-                .header(20.0, |mut header| {
-                    header.col(|ui| {
-                        ui.add(egui::Label::new("Enabled").wrap_mode(egui::TextWrapMode::Extend));
-                    });
-                    header.col(|ui| {
-                        ui.label("Preset Name");
-                    });
-                })
-                .body(|mut body| {
-                    for (preset_name, preset) in &mut self.presets {
-                        body.row(20.0, |mut row| {
-                            row.col(|ui| {
-                                let text = if preset.is_enabled() {
-                                    RichText::new("Enabled").color(egui::Color32::GREEN)
-                                } else {
-                                    RichText::new("Disabled").color(egui::Color32::RED)
-                                };
-                                if ui.button(text).clicked() {
-                                    if preset.is_enabled() {
-                                        preset.disable(&mut self.beam_mod_config).unwrap();
-                                    } else {
-                                        preset.enable();
-                                    }
-                                    preset.save_to_path(&self.beam_paths.presets_dir).unwrap();
-                                    self.beam_mod_config
-                                        .apply_presets(&self.beam_paths.presets_dir)
-                                        .unwrap();
-                                    self.beam_mod_config
-                                        .save_to_path(&self.beam_paths.mods_dir)
-                                        .unwrap();
-                                }
-                            });
-                            row.col(|ui| {
-                                ui.label(&*preset_name);
-                            });
-                        });
-                    }
-                });
-
-            ui.separator();
-
-            ui.horizontal(|ui| {
-                let mut preset_name: String = if let Some(preset_name) = &self.current_preset {
-                    preset_name
-                } else {
-                    "None"
-                }
-                .into();
-                ui.label("Edit Preset:");
-                ui.menu_button(preset_name.clone(), |ui| {
-                    for preset in beammm::Preset::list(&self.beam_paths.presets_dir).unwrap() {
-                        if ui.button(&preset).clicked() {
-                            preset_name = preset.to_owned();
-                            ui.close_menu();
-                        }
-                    }
-                    ui.horizontal(|ui| {
-                        ui.text_edit_singleline(&mut self.new_preset_name);
-                        if ui.button("Create").clicked() {
-                            let new_preset_name = self.new_preset_name.clone();
-                            self.new_preset_name = "".into();
-                            let new_preset = Preset::new(new_preset_name.clone(), vec![]);
-                            new_preset
-                                .save_to_path(&self.beam_paths.presets_dir)
-                                .unwrap();
-                            self.presets.push((new_preset_name.clone(), new_preset));
-                            preset_name = new_preset_name;
-                            ui.close_menu();
-                        }
-                    })
-                });
-                self.current_preset = if preset_name == "None" {
-                    None
-                } else {
-                    Some(preset_name)
-                };
-            });
-            let mut delete_preset = false;
-            if let Some(preset_name) = &self.current_preset {
-                if ui.button("Delete Preset").clicked() {
-                    delete_preset = true;
-                }
-
-                // ui.label("Preset Mods");
-
-                let preset = &mut self
-                    .presets
-                    .iter_mut()
-                    .find(|(name, _)| name == preset_name)
-                    .unwrap()
-                    .1;
-
-                let mut mods_to_remove = Vec::new();
-
-                ui.push_id("preset_mods", |ui| {
-                    TableBuilder::new(ui)
-                        .column(Column::exact(75.0).resizable(false))
-                        .column(Column::remainder())
-                        .header(20.0, |mut header| {
-                            header.col(|ui| {
-                                ui.label("");
-                            });
-                            header.col(|ui| {
-                                ui.label("Preset Mods");
-                            });
-                        })
-                        .body(|mut body| {
-                            for mod_name in preset.get_mods().clone().into_iter() {
-                                body.row(20.0, |mut row| {
-                                    row.col(|ui| {
-                                        if ui.button("Remove").clicked() {
-                                            mods_to_remove.push(mod_name.clone());
-                                        }
-                                    });
-                                    row.col(|ui| {
-                                        ui.label(&*mod_name);
-                                    });
-                                });
-                            }
-                        });
-                    preset.remove_mods(&mods_to_remove);
-                    preset.save_to_path(&self.beam_paths.presets_dir).unwrap();
-                });
-            }
-            if delete_preset {
-                if let Some(preset_name) = &self.current_preset {
-                    Preset::delete(&preset_name, &self.beam_paths.presets_dir).unwrap();
-                    self.presets.retain(|(name, _)| name != preset_name);
-                }
-                self.current_preset = None;
-            }
-        });
+        components::title_panel(ctx, env!("CARGO_PKG_VERSION"), &self.game_version);
+        components::presets_panel(ctx, self);
 
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.heading("Mods");
