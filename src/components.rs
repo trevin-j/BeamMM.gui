@@ -23,52 +23,7 @@ pub fn presets_panel(ctx: &egui::Context, app_data: &mut App) {
         ui.heading("Presets");
         ui.horizontal(|_| {});
 
-        ui.label("All Presets:");
-        TableBuilder::new(ui)
-            .column(Column::exact(75.0))
-            .column(Column::auto().resizable(false))
-            .header(20.0, |mut header| {
-                header.col(|ui| {
-                    ui.add(egui::Label::new("Enabled").wrap_mode(egui::TextWrapMode::Extend));
-                });
-                header.col(|ui| {
-                    ui.label("Preset Name");
-                });
-            })
-            .body(|mut body| {
-                for (preset_name, preset) in &mut app_data.presets {
-                    body.row(20.0, |mut row| {
-                        row.col(|ui| {
-                            let text = if preset.is_enabled() {
-                                RichText::new("Enabled").color(egui::Color32::GREEN)
-                            } else {
-                                RichText::new("Disabled").color(egui::Color32::RED)
-                            };
-                            if ui.button(text).clicked() {
-                                if preset.is_enabled() {
-                                    preset.disable(&mut app_data.beam_mod_config).unwrap();
-                                } else {
-                                    preset.enable();
-                                }
-                                preset
-                                    .save_to_path(&app_data.beam_paths.presets_dir)
-                                    .unwrap();
-                                app_data
-                                    .beam_mod_config
-                                    .apply_presets(&app_data.beam_paths.presets_dir)
-                                    .unwrap();
-                                app_data
-                                    .beam_mod_config
-                                    .save_to_path(&app_data.beam_paths.mods_dir)
-                                    .unwrap();
-                            }
-                        });
-                        row.col(|ui| {
-                            ui.label(&*preset_name);
-                        });
-                    });
-                }
-            });
+        presets_table_component(ui, app_data);
 
         ui.separator();
 
@@ -80,28 +35,7 @@ pub fn presets_panel(ctx: &egui::Context, app_data: &mut App) {
             }
             .into();
             ui.label("Edit Preset:");
-            ui.menu_button(preset_name.clone(), |ui| {
-                for preset in beammm::Preset::list(&app_data.beam_paths.presets_dir).unwrap() {
-                    if ui.button(&preset).clicked() {
-                        preset_name = preset.to_owned();
-                        ui.close_menu();
-                    }
-                }
-                ui.horizontal(|ui| {
-                    ui.text_edit_singleline(&mut app_data.new_preset_name);
-                    if ui.button("Create").clicked() {
-                        let new_preset_name = app_data.new_preset_name.clone();
-                        app_data.new_preset_name = "".into();
-                        let new_preset = Preset::new(new_preset_name.clone(), vec![]);
-                        new_preset
-                            .save_to_path(&app_data.beam_paths.presets_dir)
-                            .unwrap();
-                        app_data.presets.push((new_preset_name.clone(), new_preset));
-                        preset_name = new_preset_name;
-                        ui.close_menu();
-                    }
-                })
-            });
+            preset_select_component(ui, app_data, &mut preset_name);
             app_data.current_preset = if preset_name == "None" {
                 None
             } else {
@@ -174,6 +108,80 @@ pub fn mods_panel(ctx: &egui::Context, app_data: &mut App) {
         mod_actions_component(ui, app_data);
         mods_table_component(ui, app_data);
     });
+}
+
+fn preset_select_component(ui: &mut egui::Ui, app_data: &mut App, preset_name: &mut String) {
+    ui.menu_button(preset_name.clone(), |ui| {
+        for preset in beammm::Preset::list(&app_data.beam_paths.presets_dir).unwrap() {
+            if ui.button(&preset).clicked() {
+                *preset_name = preset.to_owned();
+                ui.close_menu();
+            }
+        }
+        ui.horizontal(|ui| {
+            ui.text_edit_singleline(&mut app_data.new_preset_name);
+            if ui.button("Create").clicked() {
+                let new_preset_name = app_data.new_preset_name.clone();
+                app_data.new_preset_name = "".into();
+                let new_preset = Preset::new(new_preset_name.clone(), vec![]);
+                new_preset
+                    .save_to_path(&app_data.beam_paths.presets_dir)
+                    .unwrap();
+                app_data.presets.push((new_preset_name.clone(), new_preset));
+                *preset_name = new_preset_name;
+                ui.close_menu();
+            }
+        })
+    });
+}
+
+fn presets_table_component(ui: &mut egui::Ui, app_data: &mut App) {
+    ui.label("All Presets:");
+    TableBuilder::new(ui)
+        .column(Column::exact(75.0))
+        .column(Column::auto().resizable(false))
+        .header(20.0, |mut header| {
+            header.col(|ui| {
+                ui.add(egui::Label::new("Enabled").wrap_mode(egui::TextWrapMode::Extend));
+            });
+            header.col(|ui| {
+                ui.label("Preset Name");
+            });
+        })
+        .body(|mut body| {
+            for (preset_name, preset) in &mut app_data.presets {
+                body.row(20.0, |mut row| {
+                    row.col(|ui| {
+                        let text = if preset.is_enabled() {
+                            RichText::new("Enabled").color(egui::Color32::GREEN)
+                        } else {
+                            RichText::new("Disabled").color(egui::Color32::RED)
+                        };
+                        if ui.button(text).clicked() {
+                            if preset.is_enabled() {
+                                preset.disable(&mut app_data.beam_mod_config).unwrap();
+                            } else {
+                                preset.enable();
+                            }
+                            preset
+                                .save_to_path(&app_data.beam_paths.presets_dir)
+                                .unwrap();
+                            app_data
+                                .beam_mod_config
+                                .apply_presets(&app_data.beam_paths.presets_dir)
+                                .unwrap();
+                            app_data
+                                .beam_mod_config
+                                .save_to_path(&app_data.beam_paths.mods_dir)
+                                .unwrap();
+                        }
+                    });
+                    row.col(|ui| {
+                        ui.label(&*preset_name);
+                    });
+                });
+            }
+        });
 }
 
 fn mods_table_component(ui: &mut egui::Ui, app_data: &mut App) {
