@@ -2,8 +2,6 @@
 
 use beammm::Preset;
 use eframe::egui;
-use egui::RichText;
-use egui_extras::{Column, TableBuilder};
 use std::path::PathBuf;
 
 mod components;
@@ -31,7 +29,6 @@ struct BeamPaths {
 
 struct StagedMod {
     mod_name: String,
-    // active: bool,
     selected: bool,
 }
 
@@ -100,119 +97,6 @@ impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         components::title_panel(ctx, self);
         components::presets_panel(ctx, self);
-
-        egui::CentralPanel::default().show(ctx, |ui| {
-            ui.heading("Mods");
-            ui.horizontal(|_| {});
-            ui.horizontal(|ui| {
-                if ui.button("Select All").clicked() {
-                    for staged_mod in &mut self.staged_mods {
-                        staged_mod.selected = true;
-                    }
-                }
-                if ui.button("Deselect All").clicked() {
-                    for staged_mod in &mut self.staged_mods {
-                        staged_mod.selected = false;
-                    }
-                }
-            });
-            ui.horizontal(|ui| {
-                if ui.button("Enable Selected").clicked() {
-                    for staged_mod in &self.staged_mods {
-                        if staged_mod.selected {
-                            self.beam_mod_config
-                                .set_mod_active(&staged_mod.mod_name, true)
-                                .unwrap();
-                        }
-                    }
-                    self.beam_mod_config
-                        .save_to_path(&self.beam_paths.mods_dir)
-                        .unwrap();
-                }
-                if ui.button("Disable Selected").clicked() {
-                    for staged_mod in &self.staged_mods {
-                        if staged_mod.selected {
-                            self.beam_mod_config
-                                .set_mod_active(&staged_mod.mod_name, false)
-                                .unwrap();
-                        }
-                    }
-                    self.beam_mod_config
-                        .apply_presets(&self.beam_paths.presets_dir)
-                        .unwrap();
-                    self.beam_mod_config
-                        .save_to_path(&self.beam_paths.mods_dir)
-                        .unwrap();
-                }
-            });
-            ui.horizontal(|ui| {
-                if ui.button("Add to Selected Preset").clicked() {
-                    if let Some(preset_name) = &self.current_preset {
-                        let preset = &mut self
-                            .presets
-                            .iter_mut()
-                            .find(|(name, _)| name == preset_name)
-                            .unwrap()
-                            .1;
-                        for staged_mod in &self.staged_mods {
-                            if staged_mod.selected {
-                                preset.add_mod(&staged_mod.mod_name);
-                            }
-                        }
-                        preset.save_to_path(&self.beam_paths.presets_dir).unwrap();
-                        self.beam_mod_config
-                            .apply_presets(&self.beam_paths.presets_dir)
-                            .unwrap();
-                    }
-                }
-            });
-
-            TableBuilder::new(ui)
-                .column(Column::auto().resizable(false))
-                .column(Column::exact(75.0).resizable(false))
-                .column(Column::remainder())
-                .header(15.0, |mut header| {
-                    header.col(|ui| {
-                        ui.label("Select");
-                    });
-                    header.col(|ui| {
-                        ui.label("Active");
-                    });
-                    header.col(|ui| {
-                        ui.label("Mod Name");
-                    });
-                })
-                .body(|mut body| {
-                    for staged_mod in &mut self.staged_mods {
-                        body.row(20.0, |mut row| {
-                            row.col(|ui| {
-                                ui.checkbox(&mut staged_mod.selected, "");
-                            });
-                            row.col(|ui| {
-                                let active = self
-                                    .beam_mod_config
-                                    .is_mod_active(&staged_mod.mod_name)
-                                    .unwrap();
-                                let text = if active {
-                                    RichText::new("Active").color(egui::Color32::GREEN)
-                                } else {
-                                    RichText::new("Inactive").color(egui::Color32::RED)
-                                };
-                                if ui.button(text).clicked() {
-                                    self.beam_mod_config
-                                        .set_mod_active(&staged_mod.mod_name, !active)
-                                        .unwrap();
-                                    self.beam_mod_config
-                                        .save_to_path(&self.beam_paths.mods_dir)
-                                        .unwrap();
-                                }
-                            });
-                            row.col(|ui| {
-                                ui.label(&staged_mod.mod_name);
-                            });
-                        });
-                    }
-                });
-        });
+        components::mods_panel(ctx, self);
     }
 }
